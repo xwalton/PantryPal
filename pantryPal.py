@@ -33,7 +33,7 @@ def extract_input(answer, options=None):
 
 def request_recipe(dietary_intolerances, diet, ingredients):
 # This will query the Spoonacular API for recipes that match the user input.
-	api_key = "2b25d116497643558cfdf92ed2026398"
+	api_key = os.getenv('SPOONACULAR_API_KEY')
 	api_url = 'https://api.spoonacular.com/recipes/complexSearch'
 	recipe_info_url = 'https://api.spoonacular.com/recipes/{id}/information'
 
