@@ -3,12 +3,32 @@ import os
 import requests
 import re
 
-def extract_input(answer):
+def extract_input(answer, options=None):
 # This will extract user input, making sure that it isn’t an empty string or contains integer characters.
-		user_input = input(answer).strip()
-		if not user_input or any(char.isdigit() for char in user_input):
-			print("Input not valid. Please try again.")
-		else: 
+	if options:
+		options_text = ''
+		for i, option in enumerate(options, start=1):
+			options_text += f'{option:10}'
+			if i % 4 == 0:
+				options_text += '\n'
+		print("Options:\n" + options_text)
+
+	user_input = input(answer).strip()
+	if not user_input:
+		print("Input not valid. Please try again or enter 'None'.")
+	elif any(char.isdigit() for char in user_input):
+		print("Input contains numbers. Please try again.")
+	else:
+		if options:
+			input_options = {x.strip().lower() for x in user_input.split(',')}
+			if 'none' in input_options and len(input_options) > 1:
+				print("Invalid input. 'None' must be entered alone.")
+			elif not input_options.issubset({x.lower() for x in options}):
+				print("Invalid option(s) detected. Please enter valid options only.")
+				return extract_input(answer, options)
+			else:
+				return user_input.lower()
+		else:
 			return user_input.lower()
 
 def request_recipe(dietary_intolerances, diet, ingredients):
@@ -23,6 +43,8 @@ def request_recipe(dietary_intolerances, diet, ingredients):
 		'diet': diet,
 		'intolerances': dietary_intolerances,
 		'number': 1,
+		'ranking': 1,
+		'ignorePantry': True
 	}
 
 	try:
@@ -40,7 +62,7 @@ def request_recipe(dietary_intolerances, diet, ingredients):
 			recipe_title = recipe.get('title', 'No title')
 			recipe_ingredients = [ingredient['original'] for ingredient in recipe.get('extendedIngredients', [])]
 			recipe_instructions = recipe.get('instructions', 'No instructions')
-			cleaned_instructions = recipe_instructions.replace('</li>', '').replace('</ol>', '')
+			cleaned_instructions = recipe_instructions.replace('</li>', '').replace('</ol>', '').replace('<ol>', '').replace('<li>', '')
 
 			recipe_instructions_text = re.sub(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.)(?!\d)', '\n', cleaned_instructions)
 			ingredients_text = "Ingredients:\n" + "\n".join(recipe_ingredients)
@@ -114,7 +136,7 @@ def view_recent_recipe_history():
         SELECT recipe_number, title, ingredients, dietary_intolerances, diet 
         FROM recipes 
         ORDER BY recipe_number DESC 
-        LIMIT 15
+        LIMIT 10
     """)
 	recipes = cursor.fetchall()
 	conn.close()
@@ -138,9 +160,18 @@ def search_recipe_history():
 
 def main():
 	create_database()
-	
-	dietary_intolerances = extract_input("What dietary intolerances do you have? Enter as a comma separated list (e.g. dairy, peanut, gluten, etc.)")
-	diet = extract_input("Do you follow any particular diet? Enter as a comma separated list (e.g. gluten free, vegetarian, etc.) If not, write None.")
+
+	intolerance_options = [
+        'Dairy', 'Egg', 'Gluten', 'Grain',
+        'Peanut', 'Seafood', 'Sesame', 'Shellfish',
+        'Soy', 'Sulfite', 'Tree Nut', 'Wheat', 'None'
+    ]
+
+	dietary_intolerances = extract_input(
+		"What dietary intolerances do you have? Enter as a comma separated list (e.g. dairy, peanut, gluten, etc.) or enter 'None': ",
+		options=intolerance_options
+		)
+	diet = extract_input("Do you follow any particular diet? Enter as a comma separated list (e.g. gluten free, vegetarian, etc.) If not, write 'None'.")
 	ingredients = extract_input("What ingredients do you have on hand? Enter as a comma separated list.")
 
 	recipe_title, api_ingredients, recipe_text = request_recipe(dietary_intolerances, diet, ingredients)
